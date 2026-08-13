@@ -590,7 +590,7 @@ btn.addEventListener('click', async () => {
       msg += "Requests succeeded but no rate value was found in the response — the JSON shape may not match what this page expects. See the raw response below and send it to me so I can fix the parsing.";
     }
     showError(msg, firstRaw);
-    return;
+    return; 
   }
 
   const avg = values.reduce((a,b)=>a+b,0) / values.length;
