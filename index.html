@@ -279,7 +279,9 @@
 <footer>Rates from the Monetary Authority of Singapore. Weekends and public holidays have no published rate and are excluded from the average.</footer>
 
 <script>
-const BASE_URL = "https://eservices.mas.gov.sg/apimg-gw/server/monthly_statistical_bulletin_non610ora/exchange_rates_end_of_period_daily/views/exchange_rates_end_of_period_daily";
+// Calls go to the local server (app.py), which forwards them to MAS.
+// This avoids the browser CORS block that happens when calling MAS directly.
+const PROXY_URL = "/api/rate";
 
 // field name -> [api_field, divisor]
 const CURRENCIES = {
@@ -320,31 +322,15 @@ function fmtDate(d){
   return d.toISOString().slice(0,10);
 }
 
-function extractRows(json){
-  if (Array.isArray(json)) return json;
-  if (json && typeof json === 'object'){
-    for (const key of ['result','results','data','records','elements','rows']){
-      if (Array.isArray(json[key])) return json[key];
-    }
-    return [json];
-  }
-  return [];
-}
-
 async function fetchRateForDate(dateStr, keyid, fieldName){
-  const url = `${BASE_URL}?end_of_day=${dateStr}`;
-  const res = await fetch(url, { headers: { 'keyid': keyid } });
-  const text = await res.text();
-  let json;
-  try { json = JSON.parse(text); } catch(e) { json = null; }
-  const rows = json ? extractRows(json) : [];
-  const row = rows[0];
-  const value = row ? row[fieldName] : undefined;
+  const url = `${PROXY_URL}?date=${encodeURIComponent(dateStr)}&field=${encodeURIComponent(fieldName)}&keyid=${encodeURIComponent(keyid)}`;
+  const res = await fetch(url);
+  const payload = await res.json(); // { ok, status, raw, value }
   return {
-    ok: res.ok,
-    status: res.status,
-    rawText: text,
-    value: (value !== undefined && value !== null && value !== '') ? parseFloat(value) : null
+    ok: payload.ok,
+    status: payload.status,
+    rawText: payload.raw,
+    value: (payload.value !== null && payload.value !== undefined) ? parseFloat(payload.value) : null
   };
 }
 
@@ -412,7 +398,7 @@ btn.addEventListener('click', async () => {
   if (values.length === 0){
     let msg = `No rates came back for any day in ${fmtDate(start)} – ${fmtDate(end)}. `;
     if (firstFailed){
-      msg += 'The very first request failed outright — this usually means the browser was blocked from calling the MAS API directly (CORS), or the key/URL is wrong. See the raw response below.';
+      msg += 'The very first request failed outright — check that app.py is still running in your terminal, and that your keyid is correct. See the raw response below.';
     } else {
       msg += "Requests succeeded but no rate value was found in the response — the JSON shape may not match what this page expects. See the raw response below and send it to me so I can fix the parsing.";
     }
