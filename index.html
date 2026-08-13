@@ -77,7 +77,7 @@
     margin-top:5px;
     line-height:1.4;
   }
-  input[type=date], input[type=password], select{
+  input[type=date], input[type=password], input[type=text], select{
     width:100%;
     padding:10px 12px;
     font-size:14.5px;
@@ -137,24 +137,34 @@
   }
   .dot.hit{background:var(--teal);}
   .dot.miss{background:#E7C9BE;}
+  .date-input-wrap{
+    position:relative;
+  }
+  .date-input-wrap input{
+    padding-right:38px;
+  }
   #calBtn{
     position:absolute;
-    right:8px;
-    top:34px;
+    right:6px;
+    top:50%;
+    transform:translateY(-50%);
     width:28px;
     height:28px;
     padding:0;
     border:none;
     background:transparent;
-    font-size:15px;
+    font-size:16px;
     cursor:pointer;
     line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
   }
   .cal-popup{
     display:none;
     position:absolute;
     z-index:20;
-    top:68px;
+    top:calc(100% + 6px);
     left:0;
     width:260px;
     background:var(--paper-raised);
@@ -315,8 +325,10 @@
     <div class="row">
       <div class="field" style="position:relative;">
         <label for="replyDate">Reply date (DD/MM/YYYY)</label>
-        <input type="text" id="replyDate" placeholder="e.g. 05/04/2026" inputmode="numeric" maxlength="10" autocomplete="off">
-        <button type="button" id="calBtn" aria-label="Open calendar">📅</button>
+        <div class="date-input-wrap">
+          <input type="text" id="replyDate" placeholder="e.g. 05/04/2026" inputmode="numeric" maxlength="10" autocomplete="off">
+          <button type="button" id="calBtn" aria-label="Open calendar">📅</button>
+        </div>
         <div id="calPopup" class="cal-popup"></div>
       </div>
       <div class="field">
