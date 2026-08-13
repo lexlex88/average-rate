@@ -312,7 +312,7 @@
   <div class="masthead">
     <p class="eyebrow">MAS Exchange Rates</p>
     <h1>30-Day Average Calculator</h1>
-    <p class="sub">Enter a vendor's reply date and a currency. This averages the daily rate over the 30 calendar days immediately before that date.</p>
+    <p class="sub">Enter a vendor's reply date and a currency. This averages the daily rate from the same date one month before, up to the day before the reply date.</p>
   </div>
 
   <div class="body">
@@ -489,6 +489,20 @@ const resultMetaEl = document.getElementById('resultMeta');
 const btn = document.getElementById('calcBtn');
 const tbody = document.querySelector('#breakdownTable tbody');
 
+// Subtracts one calendar month, keeping the same day-of-month where possible.
+// If the target month is shorter (e.g. 31 -> Feb), clamps to that month's last day.
+function subtractOneCalendarMonth(d){
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const day = d.getUTCDate();
+  let targetMonth = month - 1;
+  let targetYear = year;
+  if (targetMonth < 0){ targetMonth = 11; targetYear--; }
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  const clampedDay = Math.min(day, daysInTargetMonth);
+  return new Date(Date.UTC(targetYear, targetMonth, clampedDay));
+}
+
 function fmtDate(d){
   return d.toISOString().slice(0,10);
 }
@@ -537,7 +551,7 @@ btn.addEventListener('click', async () => {
   if (!replyDate){ showError('Reply date must be in DD/MM/YYYY format, e.g. 05/04/2026.'); return; }
 
   const [fieldName, divisor] = CURRENCIES[currencyLabel];
-  const start = new Date(replyDate); start.setUTCDate(start.getUTCDate() - 30);
+  const start = subtractOneCalendarMonth(replyDate);
   const end = new Date(replyDate); end.setUTCDate(end.getUTCDate() - 1);
 
   const dates = [];
@@ -590,7 +604,7 @@ btn.addEventListener('click', async () => {
       msg += "Requests succeeded but no rate value was found in the response — the JSON shape may not match what this page expects. See the raw response below and send it to me so I can fix the parsing.";
     }
     showError(msg, firstRaw);
-    return; 
+    return;
   }
 
   const avg = values.reduce((a,b)=>a+b,0) / values.length;
