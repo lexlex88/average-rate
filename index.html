@@ -137,6 +137,75 @@
   }
   .dot.hit{background:var(--teal);}
   .dot.miss{background:#E7C9BE;}
+  #calBtn{
+    position:absolute;
+    right:8px;
+    top:34px;
+    width:28px;
+    height:28px;
+    padding:0;
+    border:none;
+    background:transparent;
+    font-size:15px;
+    cursor:pointer;
+    line-height:1;
+  }
+  .cal-popup{
+    display:none;
+    position:absolute;
+    z-index:20;
+    top:68px;
+    left:0;
+    width:260px;
+    background:var(--paper-raised);
+    border:1px solid var(--rule);
+    border-radius:4px;
+    box-shadow:0 6px 18px rgba(21,42,58,0.15);
+    padding:12px;
+  }
+  .cal-popup.show{display:block;}
+  .cal-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .cal-nav button{
+    width:auto;
+    padding:4px 10px;
+    font-size:13px;
+    background:var(--teal-dim);
+    color:var(--teal);
+    margin:0;
+  }
+  .cal-nav button:hover{background:var(--rule);}
+  .cal-title{
+    font-size:13px;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .cal-grid{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:2px;
+    text-align:center;
+  }
+  .cal-grid .dow{
+    font-size:10px;
+    color:var(--muted);
+    font-weight:700;
+    padding:4px 0;
+  }
+  .cal-day{
+    font-size:12.5px;
+    padding:6px 0;
+    border-radius:2px;
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .cal-day:hover{background:var(--teal-dim);}
+  .cal-day.selected{background:var(--teal);color:#fff;}
+  .cal-day.other-month{color:var(--rule);}
   .result{
     margin-top:26px;
     border-top:1px solid var(--rule);
@@ -244,9 +313,11 @@
     </div>
 
     <div class="row">
-      <div class="field">
-        <label for="replyDate">Reply date</label>
-        <input type="date" id="replyDate">
+      <div class="field" style="position:relative;">
+        <label for="replyDate">Reply date (DD/MM/YYYY)</label>
+        <input type="text" id="replyDate" placeholder="e.g. 05/04/2026" inputmode="numeric" maxlength="10" autocomplete="off">
+        <button type="button" id="calBtn" aria-label="Open calendar">📅</button>
+        <div id="calPopup" class="cal-popup"></div>
       </div>
       <div class="field">
         <label for="currency">Currency</label>
@@ -308,6 +379,94 @@ Object.keys(CURRENCIES).forEach(label => {
   currencySelect.appendChild(opt);
 });
 
+const replyDateInput = document.getElementById('replyDate');
+replyDateInput.addEventListener('input', () => {
+  let digits = replyDateInput.value.replace(/\D/g, '').slice(0, 8);
+  let out = digits;
+  if (digits.length > 4) out = digits.slice(0,2) + '/' + digits.slice(2,4) + '/' + digits.slice(4);
+  else if (digits.length > 2) out = digits.slice(0,2) + '/' + digits.slice(2);
+  replyDateInput.value = out;
+});
+
+// ---- Custom calendar picker (always DD/MM/YYYY, no locale ambiguity) ----
+const calBtn = document.getElementById('calBtn');
+const calPopup = document.getElementById('calPopup');
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW_NAMES = ["Mo","Tu","We","Th","Fr","Sa","Su"];
+let calViewYear, calViewMonth; // 0-indexed month, for whatever month is currently displayed
+
+function pad2(n){ return n < 10 ? '0'+n : ''+n; }
+
+function renderCalendar(){
+  const today = new Date();
+  const firstOfMonth = new Date(Date.UTC(calViewYear, calViewMonth, 1));
+  let startWeekday = firstOfMonth.getUTCDay(); // 0=Sun
+  startWeekday = (startWeekday + 6) % 7; // convert to Mon=0
+
+  const daysInMonth = new Date(Date.UTC(calViewYear, calViewMonth+1, 0)).getUTCDate();
+  const daysInPrevMonth = new Date(Date.UTC(calViewYear, calViewMonth, 0)).getUTCDate();
+
+  const selected = parseDDMMYYYY(replyDateInput.value);
+
+  let html = `<div class="cal-nav">
+    <button type="button" id="calPrev">‹</button>
+    <span class="cal-title">${MONTH_NAMES[calViewMonth]} ${calViewYear}</span>
+    <button type="button" id="calNext">›</button>
+  </div><div class="cal-grid">`;
+  DOW_NAMES.forEach(d => html += `<div class="dow">${d}</div>`);
+
+  for (let i=0; i<startWeekday; i++){
+    const dayNum = daysInPrevMonth - startWeekday + 1 + i;
+    html += `<div class="cal-day other-month">${dayNum}</div>`;
+  }
+  for (let day=1; day<=daysInMonth; day++){
+    const isSelected = selected && selected.getUTCFullYear()===calViewYear && selected.getUTCMonth()===calViewMonth && selected.getUTCDate()===day;
+    html += `<div class="cal-day${isSelected?' selected':''}" data-day="${day}">${day}</div>`;
+  }
+  const totalCells = startWeekday + daysInMonth;
+  const trailing = (7 - (totalCells % 7)) % 7;
+  for (let i=1; i<=trailing; i++){
+    html += `<div class="cal-day other-month">${i}</div>`;
+  }
+  html += `</div>`;
+  calPopup.innerHTML = html;
+
+  document.getElementById('calPrev').addEventListener('click', (e) => {
+    e.stopPropagation();
+    calViewMonth--; if (calViewMonth < 0){ calViewMonth = 11; calViewYear--; }
+    renderCalendar();
+  });
+  document.getElementById('calNext').addEventListener('click', (e) => {
+    e.stopPropagation();
+    calViewMonth++; if (calViewMonth > 11){ calViewMonth = 0; calViewYear++; }
+    renderCalendar();
+  });
+  calPopup.querySelectorAll('.cal-day:not(.other-month)').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const day = parseInt(el.dataset.day, 10);
+      replyDateInput.value = `${pad2(day)}/${pad2(calViewMonth+1)}/${calViewYear}`;
+      calPopup.classList.remove('show');
+    });
+  });
+}
+
+calBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const existing = parseDDMMYYYY(replyDateInput.value);
+  const base = existing || new Date();
+  calViewYear = existing ? existing.getUTCFullYear() : base.getFullYear();
+  calViewMonth = existing ? existing.getUTCMonth() : base.getMonth();
+  renderCalendar();
+  calPopup.classList.toggle('show');
+});
+
+document.addEventListener('click', (e) => {
+  if (!calPopup.contains(e.target) && e.target !== calBtn){
+    calPopup.classList.remove('show');
+  }
+});
+
 const statusEl = document.getElementById('status');
 const stripEl = document.getElementById('strip');
 const errorEl = document.getElementById('error');
@@ -320,6 +479,20 @@ const tbody = document.querySelector('#breakdownTable tbody');
 
 function fmtDate(d){
   return d.toISOString().slice(0,10);
+}
+
+// Parses a strict DD/MM/YYYY string into a UTC Date, or returns null if invalid.
+function parseDDMMYYYY(str){
+  const m = str.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const day = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const d = new Date(Date.UTC(year, month - 1, day));
+  // reject impossible dates like 31/02/2026 (JS would roll it over to March)
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null;
+  return d;
 }
 
 async function fetchRateForDate(dateStr, keyid, fieldName){
@@ -346,10 +519,12 @@ btn.addEventListener('click', async () => {
   const currencyLabel = currencySelect.value;
 
   if (!keyid){ showError('Enter your MAS API key first.'); return; }
-  if (!replyDateStr){ showError('Pick a reply date first.'); return; }
+  if (!replyDateStr){ showError('Enter a reply date first.'); return; }
+
+  const replyDate = parseDDMMYYYY(replyDateStr);
+  if (!replyDate){ showError('Reply date must be in DD/MM/YYYY format, e.g. 05/04/2026.'); return; }
 
   const [fieldName, divisor] = CURRENCIES[currencyLabel];
-  const replyDate = new Date(replyDateStr + 'T00:00:00Z');
   const start = new Date(replyDate); start.setUTCDate(start.getUTCDate() - 30);
   const end = new Date(replyDate); end.setUTCDate(end.getUTCDate() - 1);
 
