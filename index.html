@@ -347,6 +347,7 @@
       <p class="result-label" id="resultLabel">Average rate</p>
       <p class="result-value" id="resultValue">—</p>
       <p class="result-meta" id="resultMeta"></p>
+      <button type="button" id="downloadBtn" style="width:auto; padding:8px 16px; font-size:13px; margin-top:10px; background:var(--paper); color:var(--teal); border:1px solid var(--teal);">⬇ Download Excel</button>
 
       <details>
         <summary>Show daily breakdown</summary>
@@ -617,6 +618,67 @@ btn.addEventListener('click', async () => {
     tbody.appendChild(tr);
   });
   resultEl.classList.add('show');
+
+  lastResult = {
+    currencyLabel,
+    replyDateStr,
+    startStr: fmtDate(start),
+    endStr: fmtDate(end),
+    breakdown,
+    avg,
+    daysWithData: values.length,
+    totalDays: dates.length
+  };
+});
+
+let lastResult = null;
+
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  if (!lastResult) return;
+
+  const btn = document.getElementById('downloadBtn');
+  const originalText = btn.textContent;
+  btn.textContent = 'Preparing file...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currency: lastResult.currencyLabel,
+        replyDateStr: lastResult.replyDateStr,
+        startStr: lastResult.startStr,
+        endStr: lastResult.endStr,
+        breakdown: lastResult.breakdown,
+        avg: lastResult.avg
+      })
+    });
+
+    if (!res.ok){
+      alert('Could not generate the Excel file. Make sure the server (app.py) is running.');
+      return;
+    }
+
+    const blob = await res.blob();
+    const safeCurrency = lastResult.currencyLabel.replace(/[^A-Za-z0-9]/g, '');
+    const safeDate = lastResult.replyDateStr.replace(/\//g, '-');
+    const filename = `fx_average_${safeCurrency}_${safeDate}.xlsx`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Something went wrong generating the file: ' + e);
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
 });
 
 function showError(msg, raw){

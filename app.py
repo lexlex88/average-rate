@@ -20,12 +20,16 @@ browser. Paste your MAS keyid into the page itself, same as before.
 
 import json
 import os
+import io
 import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, quote
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment
 
 PORT = int(os.environ.get("PORT", 8765))
 
@@ -81,6 +85,60 @@ def fetch_from_mas(date_str, field_name, keyid):
     return {"ok": True, "status": status, "raw": raw, "value": value}
 
 
+def build_excel(payload):
+    currency = payload.get("currency", "")
+    reply_date_str = payload.get("replyDateStr", "")
+    start_str = payload.get("startStr", "")
+    end_str = payload.get("endStr", "")
+    breakdown = payload.get("breakdown", [])  # list of [date, rate]
+    avg = payload.get("avg", None)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "FX Average"
+
+    bold = Font(bold=True)
+    title_font = Font(bold=True, size=13)
+    yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
+    ws.append(["MAS Exchange Rates - 30-Day Average"])
+    ws["A1"].font = title_font
+    ws.append([f"Vendor reply date: {reply_date_str}"])
+    ws.append([f"Currency: {currency}"])
+    ws.append([])
+
+    header_row = ws.max_row + 1
+    ws.append(["Date", "Rate"])
+    ws.cell(row=header_row, column=1).font = bold
+    ws.cell(row=header_row, column=2).font = bold
+
+    first_data_row = ws.max_row + 1
+    for date_str, rate in breakdown:
+        ws.append([date_str, float(rate)])
+    last_data_row = ws.max_row
+
+    # Highlight the whole used range in yellow (this IS the range that was used)
+    for row in range(first_data_row, last_data_row + 1):
+        ws.cell(row=row, column=1).fill = yellow_fill
+        ws.cell(row=row, column=2).fill = yellow_fill
+
+    ws.append([])
+    ws.append([f"Average rate used is from {start_str} to {end_str}"])
+    ws.cell(row=ws.max_row, column=1).font = bold
+
+    if avg is not None:
+        ws.append([f"Average rate: {round(float(avg), 4)}"])
+        ws.cell(row=ws.max_row, column=1).font = bold
+
+    ws.column_dimensions["A"].width = 16
+    ws.column_dimensions["B"].width = 12
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
 INDEX_HTML = None  # filled in at startup by reading index.html
 
 
@@ -119,6 +177,38 @@ class Handler(BaseHTTPRequestHandler):
 
             result = fetch_from_mas(date_str, field, keyid)
             self._send_json(result, 200)
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/export":
+            length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(length)
+            try:
+                payload = json.loads(raw_body.decode("utf-8"))
+            except json.JSONDecodeError:
+                self.send_response(400)
+                self.end_headers()
+                return
+
+            try:
+                xlsx_bytes = build_excel(payload)
+            except Exception as e:
+                self.send_response(500)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(str(e).encode("utf-8"))
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            self.send_header("Content-Disposition", 'attachment; filename="fx_average.xlsx"')
+            self.send_header("Content-Length", str(len(xlsx_bytes)))
+            self.end_headers()
+            self.wfile.write(xlsx_bytes)
             return
 
         self.send_response(404)
