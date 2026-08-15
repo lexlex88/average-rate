@@ -638,10 +638,40 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
 
   const btn = document.getElementById('downloadBtn');
   const originalText = btn.textContent;
-  btn.textContent = 'Preparing file...';
   btn.disabled = true;
 
   try {
+    // Build the wider "month view" context: from the 1st of the window's
+    // start month, through the window end date (matches how MAS's own
+    // site shows a full previous month + current month up to date).
+    const windowStart = parseDDMMYYYY_from_iso(lastResult.startStr);
+    const windowEnd = parseDDMMYYYY_from_iso(lastResult.endStr);
+    const displayStart = new Date(Date.UTC(windowStart.getUTCFullYear(), windowStart.getUTCMonth(), 1));
+
+    // Figure out which extra dates (before the window) we still need to fetch.
+    const extraDates = [];
+    for (let d = new Date(displayStart); d < windowStart; d.setUTCDate(d.getUTCDate()+1)){
+      extraDates.push(new Date(d));
+    }
+
+    const keyid = document.getElementById('keyid').value.trim();
+    const [fieldName, divisor] = CURRENCIES[currencySelect.value];
+
+    const extraBreakdown = [];
+    for (let i=0; i<extraDates.length; i++){
+      const dStr = fmtDate(extraDates[i]);
+      btn.textContent = `Fetching ${i+1} of ${extraDates.length} extra days...`;
+      const r = await fetchRateForDate(dStr, keyid, fieldName);
+      if (r.value !== null && !isNaN(r.value)){
+        extraBreakdown.push([dStr, (r.value/divisor).toFixed(4)]);
+      }
+      await new Promise(res => setTimeout(res, 60));
+    }
+
+    btn.textContent = 'Preparing file...';
+
+    const displayBreakdown = extraBreakdown.concat(lastResult.breakdown);
+
     const res = await fetch('/api/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -650,7 +680,7 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
         replyDateStr: lastResult.replyDateStr,
         startStr: lastResult.startStr,
         endStr: lastResult.endStr,
-        breakdown: lastResult.breakdown,
+        displayBreakdown: displayBreakdown,
         avg: lastResult.avg
       })
     });
@@ -680,6 +710,12 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+// Parses a YYYY-MM-DD string (as used internally for windowStart/End) into a UTC Date.
+function parseDDMMYYYY_from_iso(isoStr){
+  const [y, m, d] = isoStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
 
 function showError(msg, raw){
   errorEl.classList.add('show');

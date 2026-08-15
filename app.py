@@ -88,9 +88,9 @@ def fetch_from_mas(date_str, field_name, keyid):
 def build_excel(payload):
     currency = payload.get("currency", "")
     reply_date_str = payload.get("replyDateStr", "")
-    start_str = payload.get("startStr", "")
-    end_str = payload.get("endStr", "")
-    breakdown = payload.get("breakdown", [])  # list of [date, rate]
+    window_start_str = payload.get("startStr", "")
+    window_end_str = payload.get("endStr", "")
+    display_rows = payload.get("displayBreakdown", [])  # list of [date, rate], full month context
     avg = payload.get("avg", None)
 
     wb = Workbook()
@@ -112,18 +112,15 @@ def build_excel(payload):
     ws.cell(row=header_row, column=1).font = bold
     ws.cell(row=header_row, column=2).font = bold
 
-    first_data_row = ws.max_row + 1
-    for date_str, rate in breakdown:
+    for date_str, rate in display_rows:
+        row_num = ws.max_row + 1
         ws.append([date_str, float(rate)])
-    last_data_row = ws.max_row
-
-    # Highlight the whole used range in yellow (this IS the range that was used)
-    for row in range(first_data_row, last_data_row + 1):
-        ws.cell(row=row, column=1).fill = yellow_fill
-        ws.cell(row=row, column=2).fill = yellow_fill
+        if window_start_str <= date_str <= window_end_str:
+            ws.cell(row=row_num, column=1).fill = yellow_fill
+            ws.cell(row=row_num, column=2).fill = yellow_fill
 
     ws.append([])
-    ws.append([f"Average rate used is from {start_str} to {end_str}"])
+    ws.append([f"Average rate used is from {window_start_str} to {window_end_str}"])
     ws.cell(row=ws.max_row, column=1).font = bold
 
     if avg is not None:
