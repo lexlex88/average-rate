@@ -1,7 +1,7 @@
 """
 MAS Exchange Rate - 30-Day Average Calculator (local web app)
 ----------------------------------------------------------------
-Run this, then open the link it prints in your browser. 
+Run this, then open the link it prints in your browser.
 
 This runs a tiny local web server on your own computer. The page in
 your browser talks to this local server, and THIS SERVER (not your
@@ -101,7 +101,7 @@ def build_excel(payload):
     title_font = Font(bold=True, size=13)
     yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-    ws.append(["MAS Exchange Rates - 30-Day Average"])
+    ws.append(["MAS Exchange Rates"])
     ws["A1"].font = title_font
     ws.append([f"Vendor reply date: {reply_date_str}"])
     ws.append([f"Currency: {currency}"])
