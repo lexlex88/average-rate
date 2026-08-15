@@ -694,7 +694,7 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
     const safeCurrency = lastResult.currencyLabel.replace(/[^A-Za-z0-9]/g, '');
     const safeDate = lastResult.replyDateStr.replace(/\//g, '-');
     const filename = `fx_average_${safeCurrency}_${safeDate}.xlsx`;
-
+ 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
