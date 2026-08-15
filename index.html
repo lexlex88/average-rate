@@ -311,8 +311,8 @@
 <div class="sheet">
   <div class="masthead">
     <p class="eyebrow">MAS Exchange Rates</p>
-    <h1>30-Day Average Calculator</h1>
-    <p class="sub">Enter a vendor's reply date and a currency. This averages the daily rate from the same date one month before, up to the day before the reply date.</p>
+    <h1>Average Calculator</h1>
+    <p class="sub">Enter a vendor's reply date and a currency.<br><br>This averages the daily rate from the same date one month before, up to the day before the vendor's reply date.<br><br>For example, if the vendor replies on 1 August, the average is calculated using the daily rates from 1 July to 31 July.</p>
   </div>
 
   <div class="body">
@@ -694,7 +694,7 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
     const safeCurrency = lastResult.currencyLabel.replace(/[^A-Za-z0-9]/g, '');
     const safeDate = lastResult.replyDateStr.replace(/\//g, '-');
     const filename = `fx_average_${safeCurrency}_${safeDate}.xlsx`;
- 
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
